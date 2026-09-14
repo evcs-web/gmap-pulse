@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>GMAP Pulse Survey</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FBF8F2; --surface:#FFFFFF; --ink:#26332C; --muted:#6B7A72;
+    --accent:#3E7C6F; --accent-dark:#2C5C52; --warm:#EFA13B; --warm-soft:#FCEBD1;
+    --line:#E7E1D3; --sky:#DCEAE5; --danger:#C1583F;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; min-height:100%; background:var(--bg); color:var(--ink); font-family:'Karla',sans-serif; }
+
+  #surveyView{
+    display:flex; align-items:center; justify-content:center;
+    min-height:100vh; padding:32px 16px; position:relative; overflow-x:hidden;
+  }
+  .blob{ position:fixed; border-radius:50%; filter:blur(2px); z-index:0; pointer-events:none; }
+  .blob-1{ width:340px; height:340px; background:var(--warm-soft); top:-140px; left:-120px; opacity:.9;}
+  .blob-2{ width:260px; height:260px; background:var(--sky); bottom:-100px; right:-90px; opacity:.9;}
+  .stage{ position:relative; z-index:1; width:100%; max-width:460px; }
+  .card{
+    background:var(--surface); border-radius:28px; padding:40px 32px 32px;
+    box-shadow:0 1px 2px rgba(38,51,44,.04), 0 18px 40px -14px rgba(38,51,44,.16);
+    border:1px solid var(--line); animation:riseIn .5s cubic-bezier(.2,.8,.2,1);
+  }
+  @keyframes riseIn{ from{ opacity:0; transform:translateY(14px) scale(.98); } to{ opacity:1; transform:translateY(0) scale(1); } }
+  @media (prefers-reduced-motion: reduce){ .card{ animation:none; } }
+
+  .progress-row{ display:flex; align-items:center; gap:10px; margin-bottom:28px; }
+  .progress-track{ flex:1; height:6px; border-radius:999px; background:var(--line); overflow:hidden; }
+  .progress-fill{ height:100%; border-radius:999px; background:var(--accent); transition:width .4s cubic-bezier(.2,.8,.2,1); }
+  .progress-label{ font-size:.78rem; color:var(--muted); white-space:nowrap; font-weight:600; }
+
+  .step{ display:none; }
+  .step.active{ display:block; animation:fadeStep .35s ease; }
+  @keyframes fadeStep{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+  @media (prefers-reduced-motion: reduce){ .step.active{ animation:none; } }
+
+  h1.title{ font-family:'Fredoka', sans-serif; font-weight:600; font-size:1.7rem; line-height:1.25; margin:0 0 8px; color:var(--ink); }
+  .question{ font-family:'Fredoka', sans-serif; font-weight:600; font-size:1.35rem; line-height:1.35; margin:0 0 24px; color:var(--ink); }
+  .hint{ font-size:.85rem; color:var(--muted); margin-top:-14px; margin-bottom:22px; }
+
+  input[type="email"], textarea{
+    width:100%; font-family:'Karla', sans-serif; font-size:1rem; padding:14px 16px;
+    border-radius:14px; border:1.5px solid var(--line); background:#FCFBF8; color:var(--ink);
+    outline:none; transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  textarea{ resize:vertical; min-height:110px; }
+  input[type="email"]:focus, textarea:focus{ border-color:var(--accent); box-shadow:0 0 0 4px rgba(62,124,111,.12); }
+
+  .error-text{ color:var(--danger); font-size:.85rem; margin-top:8px; min-height:1.1em; }
+
+  .emoji-scale{ display:flex; justify-content:space-between; gap:8px; margin-bottom:10px; }
+  .emoji-btn{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:8px;
+    background:#FCFBF8; border:1.5px solid var(--line); border-radius:16px; padding:14px 4px 10px;
+    cursor:pointer; transition:transform .15s ease, border-color .15s ease, background .15s ease;
+  }
+  .emoji-btn:hover{ transform:translateY(-2px); border-color:#CFE3DC; }
+  .emoji-btn .e{ font-size:1.8rem; line-height:1; }
+  .emoji-btn .n{ font-size:.72rem; color:var(--muted); font-weight:600; }
+  .emoji-btn.selected{ background:var(--warm-soft); border-color:var(--warm); transform:translateY(-2px); }
+  .scale-caption{ display:flex; justify-content:space-between; font-size:.78rem; color:var(--muted); margin-bottom:24px; padding:0 2px; }
+
+  .choice-list{ display:flex; flex-direction:column; gap:10px; margin-bottom:8px; }
+  .choice-row{
+    display:flex; align-items:center; gap:12px; background:#FCFBF8; border:1.5px solid var(--line);
+    border-radius:14px; padding:14px 16px; cursor:pointer; font-size:.98rem; font-weight:600; color:var(--ink);
+    transition:border-color .15s ease, background .15s ease, transform .15s ease;
+  }
+  .choice-row:hover{ border-color:#CFE3DC; transform:translateX(2px); }
+  .choice-row.selected{ background:var(--warm-soft); border-color:var(--warm); }
+  .choice-dot{ width:10px; height:10px; border-radius:50%; border:1.5px solid var(--line); flex-shrink:0; }
+  .choice-row.selected .choice-dot{ background:var(--warm); border-color:var(--warm); }
+
+  .btn-row{ display:flex; gap:10px; margin-top:26px; }
+  button.primary{
+    flex:1; background:var(--accent); color:#fff; border:none; border-radius:14px; padding:14px 18px;
+    font-family:'Karla', sans-serif; font-weight:700; font-size:.98rem; cursor:pointer;
+    transition:background .15s ease, transform .1s ease;
+  }
+  button.primary:hover{ background:var(--accent-dark); }
+  button.primary:active{ transform:scale(.98); }
+  button.primary:disabled{ background:#BFCFC9; cursor:not-allowed; }
+  button.ghost{
+    background:transparent; color:var(--muted); border:1.5px solid var(--line); border-radius:14px;
+    padding:14px 18px; font-family:'Karla', sans-serif; font-weight:700; font-size:.98rem; cursor:pointer;
+  }
+  button.ghost:hover{ border-color:#CFE3DC; color:var(--ink); }
+
+  .back-link{
+    display:inline-flex; align-items:center; gap:6px; background:none; border:none; color:var(--muted);
+    font-family:'Karla', sans-serif; font-size:.85rem; font-weight:600; cursor:pointer; padding:0; margin-bottom:18px;
+  }
+  .back-link:hover{ color:var(--ink); }
+
+  .welcome-emoji{ font-size:2.6rem; margin-bottom:6px; }
+  .welcome-copy{ color:var(--muted); font-size:.98rem; line-height:1.5; margin-bottom:28px; }
+  .meta-line{ display:flex; gap:16px; font-size:.82rem; color:var(--muted); margin-bottom:28px; flex-wrap:wrap; }
+  .meta-line span{ display:flex; align-items:center; gap:6px; }
+
+  .thanks-wrap{ text-align:center; padding:12px 0 4px; }
+  .thanks-emoji{ font-size:3rem; margin-bottom:14px; }
+  .status-msg{ font-size:.85rem; color:var(--muted); margin-top:14px; text-align:center; }
+</style>
+</head>
+<body>
+
+<div id="surveyView">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+
+  <div class="stage">
+    <div class="card" id="card">
+
+      <div class="step active" data-step="0">
+        <div class="welcome-emoji">👋</div>
+        <h1 class="title">GMAP Pulse Survey</h1>
+        <p class="welcome-copy">A quick check-in on how your rotation is going. Five short questions, about 30 seconds.</p>
+        <div class="meta-line">
+          <span>⏱️ ~30 sec</span>
+          <span>🔒 Shared with your program team</span>
+        </div>
+        <div class="btn-row">
+          <button class="primary" onclick="goTo(1)">Let's go</button>
+        </div>
+      </div>
+
+      <div class="step" data-step="1">
+        <button class="back-link" onclick="goTo(0)">← Back</button>
+        <div class="progress-row">
+          <div class="progress-track"><div class="progress-fill" style="width:20%"></div></div>
+          <div class="progress-label">1 of 5</div>
+        </div>
+        <h2 class="question">What's your email address?</h2>
+        <input type="email" id="emailInput" placeholder="you@company.com" autocomplete="email">
+        <div class="error-text" id="emailError"></div>
+        <div class="btn-row">
+          <button class="primary" onclick="submitEmail()">Continue</button>
+        </div>
+      </div>
+
+      <div class="step" data-step="2">
+        <button class="back-link" onclick="goTo(1)">← Back</button>
+        <div class="progress-row">
+          <div class="progress-track"><div class="progress-fill" style="width:40%"></div></div>
+          <div class="progress-label">2 of 5</div>
+        </div>
+        <h2 class="question">Overall, how are you feeling about your current rotation?</h2>
+        <div class="emoji-scale" id="rotationScale"></div>
+        <div class="scale-caption"><span>Struggling</span><span>Thriving</span></div>
+        <div class="error-text" id="rotationError"></div>
+      </div>
+
+      <div class="step" data-step="3">
+        <button class="back-link" onclick="goTo(2)">← Back</button>
+        <div class="progress-row">
+          <div class="progress-track"><div class="progress-fill" style="width:60%"></div></div>
+          <div class="progress-label">3 of 5</div>
+        </div>
+        <h2 class="question">How manageable is your current workload?</h2>
+        <div class="emoji-scale" id="workloadScale"></div>
+        <div class="scale-caption"><span>Overwhelmed</span><span>Very light</span></div>
+        <div class="error-text" id="workloadError"></div>
+      </div>
+
+      <div class="step" data-step="4">
+        <button class="back-link" onclick="goTo(3)">← Back</button>
+        <div class="progress-row">
+          <div class="progress-track"><div class="progress-fill" style="width:80%"></div></div>
+          <div class="progress-label">4 of 5</div>
+        </div>
+        <h2 class="question">How often do you meet with your Reporting Manager (1:1 or otherwise)?</h2>
+        <div class="choice-list" id="managerChoices"></div>
+        <div class="error-text" id="managerError"></div>
+      </div>
+
+      <div class="step" data-step="5">
+        <button class="back-link" onclick="goTo(4)">← Back</button>
+        <div class="progress-row">
+          <div class="progress-track"><div class="progress-fill" style="width:100%"></div></div>
+          <div class="progress-label">5 of 5</div>
+        </div>
+        <h2 class="question">Is there anything you'd like to highlight to us right now?</h2>
+        <div class="hint">Optional — wins, blockers, anything on your mind.</div>
+        <textarea id="highlightInput" placeholder="Type here..."></textarea>
+        <div class="btn-row">
+          <button class="ghost" onclick="submitSurvey()">Skip &amp; submit</button>
+          <button class="primary" id="submitBtn" onclick="submitSurvey()">Submit</button>
+        </div>
+        <div class="status-msg" id="submitStatus"></div>
+      </div>
+
+      <div class="step" data-step="6">
+        <div class="thanks-wrap">
+          <div class="thanks-emoji">🎉</div>
+          <h1 class="title">Thanks for sharing!</h1>
+          <p class="welcome-copy">Your response has been recorded. Your program team appreciates the honesty.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  /* ==================== CONFIG — your Google Form endpoint + field IDs ==================== */
+  const FORM_ACTION_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSeKhUGUgBPN6jeobCK3-WG8a0gyG_UJanYc7L2jnrp22PgHWw/formResponse';
+  const ENTRY = {
+    email: 'entry.2004776526',
+    rotation: 'entry.1995864489',
+    workload: 'entry.426716909',
+    managerFreq: 'entry.1832966552',
+    highlight: 'entry.1359009841',
+    id: 'entry.288426409',
+    week: 'entry.1433468009'
+  };
+  // Translates internal 1–5 numbers into the exact label strings the Form's
+  // radio choices expect. Update these if you edit the Form's option text later.
+  const rotationLabels = { 1:'1: Struggling', 2:'2: Surviving', 3:'3: Maintaining', 4:'4: Progressing', 5:'5: Thriving' };
+  const workloadLabels = { 1:'1: Overwhelmed', 2:'2: Heavy', 3:'3: Manageable', 4:'4: Comfortable', 5:'5: Very light' };
+
+  /* ==================== SURVEY LOGIC ==================== */
+  const state = { email:'', rotation:null, workload:null, managerFreq:null, highlight:'' };
+
+  const rotationEmojis = [
+    { v:1, e:'😖', n:'1' }, { v:2, e:'😕', n:'2' }, { v:3, e:'😐', n:'3' },
+    { v:4, e:'🙂', n:'4' }, { v:5, e:'😄', n:'5' },
+  ];
+  const workloadEmojis = [
+    { v:1, e:'🥵', n:'1' }, { v:2, e:'😣', n:'2' }, { v:3, e:'😌', n:'3' },
+    { v:4, e:'🙂', n:'4' }, { v:5, e:'😎', n:'5' },
+  ];
+  const managerOptions = ['Multiple times a week','Weekly','Every 2 weeks','Monthly','Less than once a month'];
+
+  function buildEmojiScale(containerId, list, key, errorId, nextStep){
+    const el = document.getElementById(containerId);
+    el.innerHTML = '';
+    list.forEach(item => {
+      const btn = document.createElement('div');
+      btn.className = 'emoji-btn';
+      btn.innerHTML = `<span class="e">${item.e}</span><span class="n">${item.n}</span>`;
+      btn.onclick = () => {
+        state[key] = item.v;
+        [...el.children].forEach(c => c.classList.remove('selected'));
+        btn.classList.add('selected');
+        document.getElementById(errorId).textContent = '';
+        setTimeout(() => goTo(nextStep), 300);
+      };
+      el.appendChild(btn);
+    });
+  }
+
+  function buildChoiceList(){
+    const el = document.getElementById('managerChoices');
+    el.innerHTML = '';
+    managerOptions.forEach(opt => {
+      const row = document.createElement('div');
+      row.className = 'choice-row';
+      row.innerHTML = `<span class="choice-dot"></span><span>${opt}</span>`;
+      row.onclick = () => {
+        state.managerFreq = opt;
+        [...el.children].forEach(c => c.classList.remove('selected'));
+        row.classList.add('selected');
+        document.getElementById('managerError').textContent = '';
+        setTimeout(() => goTo(5), 300);
+      };
+      el.appendChild(row);
+    });
+  }
+
+  buildEmojiScale('rotationScale', rotationEmojis, 'rotation', 'rotationError', 3);
+  buildEmojiScale('workloadScale', workloadEmojis, 'workload', 'workloadError', 4);
+  buildChoiceList();
+
+  function goTo(stepNum){
+    document.querySelectorAll('#surveyView .step').forEach(s => s.classList.remove('active'));
+    const target = document.querySelector(`#surveyView .step[data-step="${stepNum}"]`);
+    if(target){ target.classList.add('active'); }
+    window.scrollTo(0,0);
+  }
+
+  function validEmail(v){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
+
+  function getISOWeekLabel(date){
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2,'0')}`;
+  }
+
+  function submitEmail(){
+    const val = document.getElementById('emailInput').value.trim();
+    if(!validEmail(val)){
+      document.getElementById('emailError').textContent = 'Please enter a valid email address.';
+      return;
+    }
+    state.email = val;
+    document.getElementById('emailError').textContent = '';
+    goTo(2);
+  }
+
+  async function submitSurvey(){
+    if(state.rotation === null){ goTo(2); document.getElementById('rotationError').textContent = 'Please answer this question.'; return; }
+    if(state.workload === null){ goTo(3); document.getElementById('workloadError').textContent = 'Please answer this question.'; return; }
+    if(!state.managerFreq){ goTo(4); document.getElementById('managerError').textContent = 'Please select an option.'; return; }
+    state.highlight = document.getElementById('highlightInput').value.trim();
+
+    const submitBtn = document.getElementById('submitBtn');
+    const statusEl = document.getElementById('submitStatus');
+    submitBtn.disabled = true;
+    statusEl.textContent = 'Submitting...';
+
+    const id = 'resp_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
+    const now = new Date();
+    const week = getISOWeekLabel(now);
+
+    const formData = new URLSearchParams();
+    formData.append(ENTRY.email, state.email);
+    formData.append(ENTRY.rotation, rotationLabels[state.rotation]);
+    formData.append(ENTRY.workload, workloadLabels[state.workload]);
+    formData.append(ENTRY.managerFreq, state.managerFreq);
+    formData.append(ENTRY.highlight, state.highlight);
+    formData.append(ENTRY.id, id);
+    formData.append(ENTRY.week, week);
+
+    try{
+      // Google Forms doesn't return usable CORS headers, so we send this in
+      // no-cors mode — meaning we can't actually read back success/failure.
+      // We show the thank-you screen optimistically after the request fires.
+      await fetch(FORM_ACTION_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData.toString()
+      });
+      goTo(6);
+    }catch(err){
+      console.error('Submit error:', err);
+      statusEl.textContent = "Something went wrong — please try Submit again.";
+      submitBtn.disabled = false;
+    }
+  }
+
+  document.getElementById('emailInput').addEventListener('keydown', (e) => {
+    if(e.key === 'Enter'){ submitEmail(); }
+  });
+</script>
+</body>
+</html>
