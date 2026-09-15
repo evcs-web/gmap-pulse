@@ -151,7 +151,7 @@
           <div class="progress-track"><div class="progress-fill" style="width:40%"></div></div>
           <div class="progress-label">2 of 5</div>
         </div>
-        <h2 class="question">Overall, how are you feeling about your current rotation?</h2>
+        <h2 class="question">How are you feeling about your rotation this week?</h2>
         <div class="emoji-scale" id="rotationScale"></div>
         <div class="scale-caption"><span>Struggling</span><span>Thriving</span></div>
         <div class="error-text" id="rotationError"></div>
@@ -163,7 +163,7 @@
           <div class="progress-track"><div class="progress-fill" style="width:60%"></div></div>
           <div class="progress-label">3 of 5</div>
         </div>
-        <h2 class="question">How manageable is your current workload?</h2>
+        <h2 class="question">How manageable has your workload felt this week?</h2>
         <div class="emoji-scale" id="workloadScale"></div>
         <div class="scale-caption"><span>Overwhelmed</span><span>Very light</span></div>
         <div class="error-text" id="workloadError"></div>
@@ -175,9 +175,10 @@
           <div class="progress-track"><div class="progress-fill" style="width:80%"></div></div>
           <div class="progress-label">4 of 5</div>
         </div>
-        <h2 class="question">How often do you meet with your Reporting Manager (1:1 or otherwise)?</h2>
-        <div class="choice-list" id="managerChoices"></div>
-        <div class="error-text" id="managerError"></div>
+        <h2 class="question">How supported have you felt by your Reporting Manager/team this week?</h2>
+        <div class="emoji-scale" id="supportedScale"></div>
+        <div class="scale-caption"><span>Unsupported</span><span>Fully supported</span></div>
+        <div class="error-text" id="supportedError"></div>
       </div>
 
       <div class="step" data-step="5">
@@ -186,7 +187,7 @@
           <div class="progress-track"><div class="progress-fill" style="width:100%"></div></div>
           <div class="progress-label">5 of 5</div>
         </div>
-        <h2 class="question">Is there anything you'd like to highlight to us right now?</h2>
+        <h2 class="question">Anything you'd like to highlight from this week?</h2>
         <div class="hint">Optional — wins, blockers, anything on your mind.</div>
         <textarea id="highlightInput" placeholder="Type here..."></textarea>
         <div class="btn-row">
@@ -215,7 +216,7 @@
     email: 'entry.2004776526',
     rotation: 'entry.1995864489',
     workload: 'entry.426716909',
-    managerFreq: 'entry.1832966552',
+    supported: 'entry.809518064',
     highlight: 'entry.1359009841',
     id: 'entry.288426409',
     week: 'entry.1433468009'
@@ -224,9 +225,10 @@
   // radio choices expect. Update these if you edit the Form's option text later.
   const rotationLabels = { 1:'1: Struggling', 2:'2: Surviving', 3:'3: Maintaining', 4:'4: Progressing', 5:'5: Thriving' };
   const workloadLabels = { 1:'1: Overwhelmed', 2:'2: Heavy', 3:'3: Manageable', 4:'4: Comfortable', 5:'5: Very light' };
+  const supportedLabels = { 1:'1: Unsupported', 2:'2: Somewhat unsupported', 3:'3: Neutral', 4:'4: Mostly supported', 5:'5: Fully supported' };
 
   /* ==================== SURVEY LOGIC ==================== */
-  const state = { email:'', rotation:null, workload:null, managerFreq:null, highlight:'' };
+  const state = { email:'', rotation:null, workload:null, supported:null, highlight:'' };
 
   const rotationEmojis = [
     { v:1, e:'😖', n:'1' }, { v:2, e:'😕', n:'2' }, { v:3, e:'😐', n:'3' },
@@ -236,7 +238,10 @@
     { v:1, e:'🥵', n:'1' }, { v:2, e:'😣', n:'2' }, { v:3, e:'😌', n:'3' },
     { v:4, e:'🙂', n:'4' }, { v:5, e:'😎', n:'5' },
   ];
-  const managerOptions = ['Multiple times a week','Weekly','Every 2 weeks','Monthly','Less than once a month'];
+  const supportedEmojis = [
+    { v:1, e:'😞', n:'1' }, { v:2, e:'😕', n:'2' }, { v:3, e:'😐', n:'3' },
+    { v:4, e:'🙂', n:'4' }, { v:5, e:'🤝', n:'5' },
+  ];
 
   function buildEmojiScale(containerId, list, key, errorId, nextStep){
     const el = document.getElementById(containerId);
@@ -256,27 +261,9 @@
     });
   }
 
-  function buildChoiceList(){
-    const el = document.getElementById('managerChoices');
-    el.innerHTML = '';
-    managerOptions.forEach(opt => {
-      const row = document.createElement('div');
-      row.className = 'choice-row';
-      row.innerHTML = `<span class="choice-dot"></span><span>${opt}</span>`;
-      row.onclick = () => {
-        state.managerFreq = opt;
-        [...el.children].forEach(c => c.classList.remove('selected'));
-        row.classList.add('selected');
-        document.getElementById('managerError').textContent = '';
-        setTimeout(() => goTo(5), 300);
-      };
-      el.appendChild(row);
-    });
-  }
-
   buildEmojiScale('rotationScale', rotationEmojis, 'rotation', 'rotationError', 3);
   buildEmojiScale('workloadScale', workloadEmojis, 'workload', 'workloadError', 4);
-  buildChoiceList();
+  buildEmojiScale('supportedScale', supportedEmojis, 'supported', 'supportedError', 5);
 
   function goTo(stepNum){
     document.querySelectorAll('#surveyView .step').forEach(s => s.classList.remove('active'));
@@ -310,7 +297,7 @@
   async function submitSurvey(){
     if(state.rotation === null){ goTo(2); document.getElementById('rotationError').textContent = 'Please answer this question.'; return; }
     if(state.workload === null){ goTo(3); document.getElementById('workloadError').textContent = 'Please answer this question.'; return; }
-    if(!state.managerFreq){ goTo(4); document.getElementById('managerError').textContent = 'Please select an option.'; return; }
+    if(state.supported === null){ goTo(4); document.getElementById('supportedError').textContent = 'Please answer this question.'; return; }
     state.highlight = document.getElementById('highlightInput').value.trim();
 
     const submitBtn = document.getElementById('submitBtn');
@@ -326,7 +313,7 @@
     formData.append(ENTRY.email, state.email);
     formData.append(ENTRY.rotation, rotationLabels[state.rotation]);
     formData.append(ENTRY.workload, workloadLabels[state.workload]);
-    formData.append(ENTRY.managerFreq, state.managerFreq);
+    formData.append(ENTRY.supported, supportedLabels[state.supported]);
     formData.append(ENTRY.highlight, state.highlight);
     formData.append(ENTRY.id, id);
     formData.append(ENTRY.week, week);
